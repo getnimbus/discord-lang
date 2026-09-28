@@ -1,13 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
-  <!-- Nimbus-style mark: portrait frame, glyph + bar on top, outlined "A" hanging below (like the Nimbus bolt) -->
-  <rect width="200" height="200" fill="#fff"/>
-  <path d="M37.3 187V13h125v174H37.3zm7-7h111V20H44.3v160z" fill="#010101"/>
-  <g stroke="#010101" stroke-width="7" fill="none" stroke-linecap="butt" stroke-linejoin="miter">
-    <path d="M100 32v10"/>
-    <path d="M74 45.5h52"/>
-    <path d="M85 52c6 11 19 19.5 36 23"/>
-    <path d="M115 52c-6 11-19 19.5-36 23"/>
-  </g>
-  <rect x="75.4" y="83" width="49.2" height="7" fill="#010101"/>
-  <path d="M92 100h16l24.5 66h-14l-5.3-14.5H86.8L81.5 166h-14L92 100zm-1.2 40.5h18.4L100 114.5l-9.2 26z" fill="none" stroke="#010101" stroke-width="6" stroke-linejoin="miter"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d78f6"/>
+      <stop offset="1" stop-color="#4752c4"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <!-- back bubble: source language -->
+  <path d="M30 18h40a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14H40l-14 12v-12.6A14 14 0 0 1 16 58V32a14 14 0 0 1 14-14z" fill="#fff" fill-opacity=".32"/>
+  <text x="50" y="57" text-anchor="middle" font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, sans-serif" font-size="32" font-weight="600" fill="#fff">文</text>
+  <!-- front bubble: your language -->
+  <path d="M58 48h40a14 14 0 0 1 14 14v26a14 14 0 0 1-10 13.4V114l-14-12H58a14 14 0 0 1-14-14V62a14 14 0 0 1 14-14z" fill="#fff"/>
+  <text x="78" y="88" text-anchor="middle" font-family="gg sans, Inter, Helvetica Neue, Arial, sans-serif" font-size="34" font-weight="800" fill="#4f5bd5">A</text>
 </svg>
