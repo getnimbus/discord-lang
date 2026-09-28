@@ -1,0 +1,13 @@
+{
+  "name": "discord-lang",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that auto-translates Discord using any OpenAI-compatible API.",
+  "scripts": {
+    "test": "node test/e2e.js",
+    "package": "sh scripts/package.sh"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

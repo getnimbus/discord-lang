@@ -14,11 +14,11 @@ Browser extension that auto-translates Discord (web) using any **OpenAI-compatib
   - Slash commands (`/…`) and messages already in the server's language are sent as-is.
   - If translation fails, nothing is sent and your draft stays in the box.
 
-## Install
+## Install (from a shared zip)
 
-**Chrome / Edge / Brave / Arc**: open `chrome://extensions`, turn on *Developer mode*, click *Load unpacked*, and pick this folder.
-
-**Firefox (121+)**: open `about:debugging#/runtime/this-firefox`, click *Load Temporary Add-on*, and pick `manifest.json`.
+1. Unzip `discord-lang-<version>.zip` into a folder you'll keep. Chrome loads the extension from that folder, so don't delete it.
+2. **Chrome / Edge / Brave / Arc**: open `chrome://extensions`, turn on *Developer mode* (top right), click *Load unpacked*, and pick the unzipped folder (the one that contains `manifest.json`).
+3. **Firefox (121+)**: open `about:debugging#/runtime/this-firefox`, click *Load Temporary Add-on*, and pick the `.zip` itself. Firefox removes temporary add-ons when it restarts.
 
 Then open the extension popup and fill in:
 
@@ -41,3 +41,62 @@ Click **Save & test**. If Discord was already open, reload the tab.
 - To cut API calls, the browser's built-in language detector skips messages that are clearly already in your language.
 - It relies on Discord's DOM (`[id^="message-content-"]` for messages, the Slate `[role="textbox"]` editor for input). A Discord UI update can break it.
 - Discord's terms don't allow client modifications. This extension only changes what you see and what you type, but use it at your own risk.
+
+## Development
+
+Plain JavaScript, no build step: the browser loads the files straight from this repo.
+
+### Setup
+
+```sh
+git clone git@github.com:getnimbus/discord-lang.git
+cd discord-lang
+npm install                      # only needed for tests (Playwright)
+npx playwright install chromium  # first time only
+```
+
+Load the repo folder with *Load unpacked* as above.
+
+### Edit → reload loop
+
+| You changed                                   | To see it                                                      |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| `src/content.js`, `src/content.css`, `src/shared.js` | Click ↻ on the extension in `chrome://extensions`, then reload the Discord tab |
+| `src/background.js`, `manifest.json`          | Click ↻ on the extension                                        |
+| `src/popup.*`                                 | Just reopen the popup                                           |
+
+Debugging:
+- **Content script**: DevTools on the Discord tab, then pick the *Discord Lang* context in the console's context dropdown.
+- **Background worker**: click *service worker* on the extension's card in `chrome://extensions`.
+- **Popup**: right-click the popup and choose *Inspect*.
+
+### Layout
+
+```
+manifest.json        MV3 manifest (Chrome + Firefox)
+src/shared.js        settings/storage helpers, loaded everywhere
+src/background.js    the only code that calls the LLM API; records daily usage
+src/content.js       runs on discord.com: incoming translation, language memory, Enter hook, LRU cache
+src/content.css      translation layout, shimmer, toast
+src/popup.*          settings, per-server controls, cost chart
+icons/               icon.svg / icon-small.svg sources and the rendered PNGs
+test/e2e.js          end-to-end test (mock Discord page + fake API)
+scripts/package.sh   builds the shareable zip
+```
+
+### Test
+
+```sh
+npm test
+```
+
+This loads the extension into headless Chromium and runs it against a mock Discord page and a fake OpenAI-compatible server. It covers incoming and outgoing translation, language memory, the display modes, the cache, and cost tracking. Screenshots go to `test/output/`. It doesn't exercise the real Discord DOM, so after changing selectors, check on discord.com too.
+
+### Package for sharing
+
+```sh
+npm run package   # → dist/discord-lang-<version>.zip
+```
+
+The zip contains only `manifest.json`, `src/`, and the icon PNGs. Bump `version` in `manifest.json` before packaging a new release.
+
