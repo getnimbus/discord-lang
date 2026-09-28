@@ -1,6 +1,10 @@
-# Discord Lang
+<p align="center">
+  <img src="icons/icon-128.png" alt="Discord Lang logo" width="96" height="96" />
+</p>
 
-Browser extension that auto-translates Discord (web) using any **OpenAI-compatible** API with your own key.
+<h1 align="center">Discord Lang</h1>
+
+<p align="center">Browser extension that auto-translates Discord (web) using any <strong>OpenAI-compatible</strong> API with your own key.</p>
 
 - **Read**: messages are translated into your language as they scroll into view, with a shimmer while a translation is in flight. Three layouts (popup → *Show*):
   - *Translation, original small below* (default)
