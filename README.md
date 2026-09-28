@@ -2,7 +2,12 @@
 
 Browser extension that auto-translates Discord (web) using any **OpenAI-compatible** API with your own key.
 
-- **Read**: messages are translated into your language as they scroll into view (shown under the original).
+- **Read**: messages are translated into your language as they scroll into view, with a shimmer while a translation is in flight. Three layouts (popup → *Show*):
+  - *Translation, original small below* (default)
+  - *Translation only*: replaces the original so it reads as if the sender wrote it. Hover to see the original.
+  - *Original, translation below*
+- **Cache**: translations are kept in an LRU cache keyed by message id (5,000 entries, saved across reloads). Scrolling back or reloading Discord doesn't spend API calls again. Edited messages are detected by a text hash and re-translated.
+- **Cost**: the popup charts your spend per day for the last 14 days, with a table view. It uses the provider's reported cost when there is one (e.g. OpenRouter). Otherwise it's tokens × the per-1M prices you set (defaults are gpt-4o-mini's list prices).
 - **Remember**: it tallies the language of every message it sees per server (and per DM). The most common one becomes that server's main language. You can pin it manually.
 - **Write**: press Enter and your message is translated into the server's main language, then sent.
   - <kbd>Alt</kbd>+<kbd>Enter</kbd> sends exactly what you typed.
@@ -33,6 +38,6 @@ Click **Save & test**. If Discord was already open, reload the tab.
 ## Notes
 
 - Messages you read or send go to whichever API provider you configure.
-- To cut API calls, the browser's built-in language detector skips messages that are clearly already in your language. Translations are cached for the rest of the session.
+- To cut API calls, the browser's built-in language detector skips messages that are clearly already in your language.
 - It relies on Discord's DOM (`[id^="message-content-"]` for messages, the Slate `[role="textbox"]` editor for input). A Discord UI update can break it.
 - Discord's terms don't allow client modifications. This extension only changes what you see and what you type, but use it at your own risk.

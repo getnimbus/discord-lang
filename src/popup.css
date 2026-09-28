@@ -160,6 +160,152 @@ kbd {
   color: var(--err);
 }
 
+.row.between {
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+button.small {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.price {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.price input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+}
+
+/* ---------- usage ---------- */
+
+.stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.stats > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+#chart {
+  display: block;
+  overflow: visible;
+}
+
+#chart .grid {
+  stroke: #3f4147;
+  stroke-width: 1;
+}
+
+#chart .axis-text {
+  fill: var(--muted);
+  font-size: 10px;
+}
+
+#chart .bar {
+  fill: #6d78f4;
+  pointer-events: none;
+}
+
+#chart .hit {
+  fill: transparent;
+  cursor: default;
+  outline: none;
+}
+
+#chart .hit:hover + .bar,
+#chart .hit:focus + .bar,
+#chart .bar.active {
+  fill: #8e97f7;
+}
+
+.tip {
+  position: absolute;
+  z-index: 1;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #111214;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 6px));
+}
+
+.tip strong {
+  display: block;
+  font-size: 13px;
+}
+
+.tip span {
+  color: var(--muted);
+}
+
+details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+table {
+  width: 100%;
+  margin-top: 4px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 2px 4px;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .switch {
   position: relative;
   width: 36px;

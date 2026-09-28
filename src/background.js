@@ -6,6 +6,35 @@ if (typeof importScripts === "function" && typeof dlGetSettings === "undefined")
   importScripts("shared.js");
 }
 
+// Daily usage totals: { "YYYY-MM-DD": { calls, in, out, billed, unbilledIn, unbilledOut } }.
+// "billed" is the exact cost when the provider reports it (e.g. OpenRouter's usage.cost);
+// otherwise tokens go in unbilled* and the popup prices them with your per-1M rates.
+const USAGE_DAYS_KEPT = 90;
+let usageChain = Promise.resolve();
+
+function recordUsage(usage) {
+  usageChain = usageChain
+    .then(async () => {
+      const day = new Date().toLocaleDateString("en-CA"); // local YYYY-MM-DD
+      const { usage: all = {} } = await chrome.storage.local.get("usage");
+      const d = all[day] || { calls: 0, in: 0, out: 0, billed: 0, unbilledIn: 0, unbilledOut: 0 };
+      const tin = usage?.prompt_tokens ?? usage?.input_tokens ?? 0;
+      const tout = usage?.completion_tokens ?? usage?.output_tokens ?? 0;
+      d.calls += 1;
+      d.in += tin;
+      d.out += tout;
+      if (typeof usage?.cost === "number") d.billed += usage.cost;
+      else {
+        d.unbilledIn += tin;
+        d.unbilledOut += tout;
+      }
+      all[day] = d;
+      for (const old of Object.keys(all).sort().slice(0, -USAGE_DAYS_KEPT)) delete all[old];
+      await chrome.storage.local.set({ usage: all });
+    })
+    .catch(() => {});
+}
+
 async function chatComplete(settings, messages) {
   if (!settings.apiKey) throw new Error("No API key set. Open the Discord Lang popup to add one.");
   const url = settings.baseUrl.replace(/\/+$/, "") + "/chat/completions";
@@ -28,6 +57,7 @@ async function chatComplete(settings, messages) {
     throw new Error(`API ${res.status}: ${detail}`.slice(0, 300));
   }
   const data = await res.json();
+  recordUsage(data?.usage);
   const content = data?.choices?.[0]?.message?.content;
   if (typeof content !== "string") throw new Error("API returned no message content");
   return content.trim();

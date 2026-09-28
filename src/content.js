@@ -5,15 +5,45 @@
 
 (() => {
   const MSG_SEL = '[id^="message-content-"]';
+  // The one-line quote above a reply also uses a message-content id; leave it alone.
+  const REPLY_SEL = '[id^="message-reply-context-"], [class*="repliedMessage"], [class*="repliedTextContent"]';
   const EDITOR_SEL = '[role="textbox"][data-slate-editor="true"]';
   const BATCH_SIZE = 15;
   const MAX_INFLIGHT = 2;
-  const MAX_CACHE = 3000;
+  const ID_CACHE_SIZE = 5000; // persisted across reloads
+  const TEXT_CACHE_SIZE = 1000; // this tab only; dedupes repeated texts like "gm"
 
   let settings = { ...DL_DEFAULT_SETTINGS };
   let guilds = {};
 
-  const cache = new Map(); // `${target}|${text}` -> { lang, translation }
+  // Least-recently-used cache: reads move an entry to the back, inserts evict from the front.
+  class Lru {
+    constructor(max) {
+      this.max = max;
+      this.map = new Map();
+    }
+    get(key) {
+      const value = this.map.get(key);
+      if (value !== undefined) {
+        this.map.delete(key);
+        this.map.set(key, value);
+      }
+      return value;
+    }
+    set(key, value) {
+      this.map.delete(key);
+      this.map.set(key, value);
+      while (this.map.size > this.max) this.map.delete(this.map.keys().next().value);
+    }
+    clear() {
+      this.map.clear();
+    }
+  }
+
+  // `${target}:${messageId}` -> { h: hash of source text, l: lang, t: translation }.
+  // The hash catches edited messages, which keep their id but change text.
+  const byId = new Lru(ID_CACHE_SIZE);
+  const byText = new Lru(TEXT_CACHE_SIZE); // `${target}|${text}` -> { lang, translation }
   const queue = new Map(); // messageId -> { el, text, guildKey }
   const observed = new WeakSet();
   const visible = new WeakSet();
@@ -84,9 +114,35 @@
     });
   }
 
-  function cacheSet(key, value) {
-    cache.set(key, value);
-    if (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value);
+  function hash(text) {
+    let h = 0x811c9dc5; // FNV-1a
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+    return (h >>> 0).toString(36);
+  }
+
+  function cacheGet(id, target, text) {
+    const e = byId.get(`${target}:${id}`);
+    if (e && e.h === hash(text)) return { lang: e.l, translation: e.t };
+    return byText.get(`${target}|${text}`);
+  }
+
+  function cacheSet(id, target, text, result) {
+    byText.set(`${target}|${text}`, result);
+    if (id) {
+      byId.set(`${target}:${id}`, { h: hash(text), l: result.lang, t: result.translation });
+      scheduleCacheSave();
+    }
+  }
+
+  let cacheSaveTimer = null;
+  function scheduleCacheSave() {
+    if (!cacheSaveTimer) cacheSaveTimer = setTimeout(saveCache, 5000);
+  }
+
+  function saveCache() {
+    clearTimeout(cacheSaveTimer);
+    cacheSaveTimer = null;
+    chrome.storage.local.set({ tcache: [...byId.map] }).catch(() => {});
   }
 
   // ---------- toast ----------
@@ -155,6 +211,7 @@
   function visibleSamples(limit = 20) {
     const out = [];
     for (const el of document.querySelectorAll(MSG_SEL)) {
+      if (el.closest(REPLY_SEL)) continue;
       const t = clean(nodeText(el));
       if (t.length >= 4 && hasLetters(t)) out.push(t.slice(0, 200));
     }
@@ -186,33 +243,117 @@
     return guildInfo(guildKey()).incoming !== false;
   }
 
-  function render(el, text, result) {
-    let box = el.nextElementSibling;
-    if (!box || !box.classList.contains("dlt-translation")) box = null;
-    if (!el.isConnected || clean(nodeText(el)) !== text) return; // message changed or left the DOM
+  function findBox(el) {
+    for (const sib of [el.previousElementSibling, el.nextElementSibling]) {
+      if (sib?.classList.contains("dlt-translation")) return sib;
+    }
+    return null;
+  }
 
+  function unrender(el) {
+    findBox(el)?.remove();
+    el.classList.remove("dlt-original", "dlt-hidden", "dlt-pending");
+    delete el.dataset.dltLang;
+    delete el.dataset.dltSrc;
+  }
+
+  function unrenderAll() {
+    queue.clear();
+    for (const box of document.querySelectorAll(".dlt-translation")) box.remove();
+    for (const el of document.querySelectorAll(MSG_SEL)) unrender(el);
+  }
+
+  // Custom emoji, unicode emoji images and mentions from the original message,
+  // keyed by the text they appear as (":name:", "🙏", "@Chubby"), so the
+  // translation can show them the same way.
+  function richTokens(el) {
+    const tokens = new Map();
+    for (const img of el.querySelectorAll("img[alt]")) {
+      const alt = img.getAttribute("alt");
+      if (alt) tokens.set(alt, img);
+    }
+    for (const m of el.querySelectorAll('[class*="mention"]')) {
+      const outer = m.parentElement?.closest('[class*="mention"]');
+      if (outer && el.contains(outer)) continue; // only the outermost mention element
+      const t = m.textContent.trim();
+      if (t) tokens.set(t, m);
+    }
+    return tokens;
+  }
+
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  function renderRich(container, text, tokens) {
+    const keys = [...tokens.keys()].sort((a, b) => b.length - a.length).map(escapeRe);
+    const re = new RegExp(`(${[...keys, "https?://[^\\s<>]+"].join("|")})`, "g");
+    for (const part of text.split(re)) {
+      if (!part) continue;
+      if (tokens.has(part)) {
+        container.append(tokens.get(part).cloneNode(true));
+      } else if (/^https?:\/\//.test(part)) {
+        const a = document.createElement("a");
+        a.href = part;
+        a.textContent = part;
+        a.target = "_blank";
+        a.rel = "noreferrer noopener";
+        container.append(a);
+      } else {
+        container.append(document.createTextNode(part));
+      }
+    }
+  }
+
+  function render(el, text, result) {
+    el.classList.remove("dlt-pending");
+    if (!el.isConnected || clean(nodeText(el)) !== text) return; // message changed or left the DOM
     if (!result?.translation) {
-      box?.remove();
+      findBox(el)?.remove();
+      el.classList.remove("dlt-original", "dlt-hidden");
+      delete el.dataset.dltLang;
       return;
+    }
+
+    // "translated": translation takes the message's place, original shown small underneath.
+    // "replace":    translation only, as if the sender wrote it (original on hover).
+    // "original":   original stays as-is, translation shown underneath.
+    const mode = settings.display;
+    const translatedFirst = mode !== "original";
+    let box = findBox(el);
+    if (box && (box.nextElementSibling === el) !== translatedFirst) {
+      box.remove();
+      box = null;
     }
     if (!box) {
       box = document.createElement("div");
-      box.className = "dlt-translation";
+      el.insertAdjacentElement(translatedFirst ? "beforebegin" : "afterend", box);
+    }
+    box.className = `dlt-translation ${translatedFirst ? "dlt-main" : "dlt-sub"}`;
+    box.title =
+      mode === "replace"
+        ? `Translated from ${dlLangName(result.lang)}. Original: ${text}`
+        : `Translated from ${dlLangName(result.lang)} by Discord Lang`;
+    box.textContent = "";
+    const from = (result.lang || "?").toUpperCase();
+    if (!translatedFirst) {
       const badge = document.createElement("span");
       badge.className = "dlt-badge";
-      const body = document.createElement("span");
-      body.className = "dlt-text";
-      box.append(badge, body);
-      el.insertAdjacentElement("afterend", box);
+      badge.textContent = `${from} → ${settings.myLang.toUpperCase()}`;
+      box.append(badge);
     }
-    const from = (result.lang || "?").toUpperCase();
-    box.querySelector(".dlt-badge").textContent = `${from} → ${settings.myLang.toUpperCase()}`;
-    box.querySelector(".dlt-badge").title = `Translated from ${dlLangName(result.lang)} by Discord Lang`;
-    box.querySelector(".dlt-text").textContent = result.translation;
+    const body = document.createElement("span");
+    body.className = "dlt-text";
+    renderRich(body, result.translation, richTokens(el));
+    box.append(body);
+
+    el.classList.toggle("dlt-original", mode === "translated");
+    el.classList.toggle("dlt-hidden", mode === "replace");
+    if (mode === "translated") el.dataset.dltLang = from;
+    else delete el.dataset.dltLang;
   }
 
   async function enqueue(el) {
     if (!incomingEnabled()) return;
+    if (el.closest(REPLY_SEL)) return;
     const text = clean(nodeText(el));
     if (!text || !hasLetters(text)) return;
     if (el.dataset.dltSrc === text) return; // already handled this exact text
@@ -221,8 +362,7 @@
     const id = messageId(el);
     const key = guildKey();
     const target = settings.myLang;
-    const cacheKey = `${target}|${text}`;
-    const hit = cache.get(cacheKey);
+    const hit = cacheGet(id, target, text);
     if (hit) {
       tally(key, id, hit.lang);
       return render(el, text, hit);
@@ -231,11 +371,12 @@
     const local = await detectLocal(text);
     if (local && local === target) {
       const result = { lang: local, translation: null };
-      cacheSet(cacheKey, result);
+      cacheSet(null, target, text, result); // free local detection: don't spend persistent slots on it
       tally(key, id, local);
       return render(el, text, result);
     }
 
+    el.classList.add("dlt-pending"); // shimmer until the translation lands
     queue.set(id, { el, text, guildKey: key, target });
     scheduleFlush();
   }
@@ -276,17 +417,21 @@
       for (const b of batch) {
         const it = byId.get(b.id);
         if (!it) {
+          b.el.classList.remove("dlt-pending");
           delete b.el.dataset.dltSrc; // let it retry next time it scrolls into view
           continue;
         }
         const result = { lang: it.lang, translation: it.lang === target ? null : it.translation };
-        cacheSet(`${b.target}|${b.text}`, result);
+        cacheSet(b.id, b.target, b.text, result);
         tally(b.guildKey, b.id, it.lang);
         const el = b.el.isConnected ? b.el : document.getElementById(`message-content-${b.id}`);
         if (el) render(el, b.text, result);
       }
     } catch (err) {
-      for (const b of batch) delete b.el.dataset.dltSrc;
+      for (const b of batch) {
+        b.el.classList.remove("dlt-pending");
+        delete b.el.dataset.dltSrc;
+      }
       toastError(err);
     }
   }
@@ -327,7 +472,7 @@
       }
       fresh.clear();
       // Edited messages: re-translate if on screen.
-      for (const el of dirty) if (visible.has(el)) enqueue(el);
+      for (const el of dirty) if (visible.has(el) || el.classList.contains("dlt-hidden")) enqueue(el);
       dirty.clear();
     });
   }
@@ -346,12 +491,10 @@
   });
 
   function resetTranslations() {
-    queue.clear();
-    for (const box of document.querySelectorAll(".dlt-translation")) box.remove();
-    for (const el of document.querySelectorAll(MSG_SEL)) {
-      delete el.dataset.dltSrc;
-      if (visible.has(el)) enqueue(el);
-    }
+    // Hidden originals (replace mode) count as on screen: they're display:none, so the observer can't see them.
+    const onScreen = [...document.querySelectorAll(MSG_SEL)].filter((el) => visible.has(el) || el.classList.contains("dlt-hidden"));
+    unrenderAll();
+    for (const el of onScreen) enqueue(el);
   }
 
   // ---------- outgoing translation ----------
@@ -437,7 +580,7 @@
       const local = await detectLocal(original);
       if (local && local === target) return pressEnter(editor);
 
-      toast(`Translating to ${dlLangName(target)}…`, "info", 0);
+      toast(`Translating to ${dlLangName(target)}…`, "busy", 0);
       const { text } = await send({ type: "translateOutgoing", text: original, target });
       const translated = text.replace(/^["“]|["”]$/g, "").trim();
       if (editorText(editor) !== original) {
@@ -468,16 +611,21 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (changes.guilds) guilds = changes.guilds.newValue || {};
+    if (changes.tcache && !changes.tcache.newValue) {
+      byId.clear(); // "Clear cache" in the popup
+      byText.clear();
+      clearTimeout(cacheSaveTimer);
+      cacheSaveTimer = null;
+    }
     if (changes.settings) {
       const prev = settings;
       settings = { ...DL_DEFAULT_SETTINGS, ...(changes.settings.newValue || {}) };
-      if (prev.myLang !== settings.myLang || (!prev.enabled && settings.enabled) || (!prev.incoming && settings.incoming)) {
-        cache.clear();
-        resetTranslations();
-      } else if (!settings.enabled || !settings.incoming) {
-        queue.clear();
-        for (const box of document.querySelectorAll(".dlt-translation")) box.remove();
-        for (const el of document.querySelectorAll(MSG_SEL)) delete el.dataset.dltSrc;
+      if (!settings.enabled || !settings.incoming) {
+        unrenderAll();
+      } else if (prev.myLang !== settings.myLang) {
+        resetTranslations(); // cache keys include the target language
+      } else if (!prev.enabled || !prev.incoming || prev.display !== settings.display) {
+        resetTranslations(); // re-renders from cache, no new API calls
       }
     }
     // Incoming toggled for the current server from the popup.
@@ -487,9 +635,7 @@
       const after = changes.guilds.newValue?.[key]?.incoming;
       if (before !== after) {
         if (after === false) {
-          queue.clear();
-          for (const box of document.querySelectorAll(".dlt-translation")) box.remove();
-          for (const el of document.querySelectorAll(MSG_SEL)) delete el.dataset.dltSrc;
+          unrenderAll();
         } else {
           resetTranslations();
         }
@@ -520,6 +666,9 @@
   (async () => {
     settings = await dlGetSettings();
     guilds = await dlGetGuilds();
+    const { tcache } = await chrome.storage.local.get("tcache");
+    for (const [k, v] of tcache || []) byId.set(k, v);
+    document.addEventListener("visibilitychange", () => cacheSaveTimer && document.hidden && saveCache());
     window.addEventListener("keydown", onKeyDown, true);
     mo.observe(document.body, { childList: true, subtree: true, characterData: true });
     for (const el of document.querySelectorAll(MSG_SEL)) fresh.add(el);

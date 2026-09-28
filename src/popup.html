@@ -37,6 +37,14 @@
         <span>My language</span>
         <select id="myLang"></select>
       </label>
+      <label class="field">
+        <span>Show</span>
+        <select id="display">
+          <option value="translated">Translation (original small below)</option>
+          <option value="replace">Translation only (replace the original)</option>
+          <option value="original">Original (translation below)</option>
+        </select>
+      </label>
       <label class="check"><input type="checkbox" id="incoming" /> Translate messages as I scroll</label>
       <label class="check"><input type="checkbox" id="outgoing" /> Translate my messages before sending</label>
       <div class="hint">Tip: <kbd>Alt</kbd>+<kbd>Enter</kbd> sends a message as typed, untranslated.</div>
@@ -56,9 +64,42 @@
         <span>Model</span>
         <input id="model" type="text" placeholder="gpt-4o-mini" spellcheck="false" />
       </label>
+      <div class="field">
+        <span>Price per 1M tokens (USD), used when the provider doesn't report cost</span>
+        <div class="row">
+          <label class="price">in $<input id="priceIn" type="number" min="0" step="0.01" /></label>
+          <label class="price">out $<input id="priceOut" type="number" min="0" step="0.01" /></label>
+        </div>
+      </div>
       <div class="row">
         <button type="button" id="save">Save &amp; test</button>
         <span id="status" class="status"></span>
+      </div>
+    </section>
+
+    <section id="usage">
+      <h2>Cost by day</h2>
+      <div class="stats">
+        <div><span class="stat-label">Today</span><span class="stat-value" id="costToday">$0</span></div>
+        <div><span class="stat-label">Last 30 days</span><span class="stat-value" id="cost30">$0</span></div>
+        <div><span class="stat-label">API calls (30d)</span><span class="stat-value" id="calls30">0</span></div>
+      </div>
+      <div class="chart-wrap">
+        <svg id="chart" height="118" role="img" aria-label="Cost per day, last 14 days"></svg>
+        <div id="tip" class="tip" hidden></div>
+      </div>
+      <details>
+        <summary>Show table</summary>
+        <table id="usageTable">
+          <thead>
+            <tr><th>Day</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </details>
+      <div class="row between">
+        <span class="hint" id="cacheInfo"></span>
+        <button type="button" id="clearCache" class="ghost small">Clear cache</button>
       </div>
     </section>
 

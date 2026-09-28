@@ -9,7 +9,26 @@ const DL_DEFAULT_SETTINGS = {
   myLang: ((typeof navigator !== "undefined" && navigator.language) || "en").split("-")[0],
   incoming: true, // translate messages as they scroll into view
   outgoing: true, // translate what I type before sending
+  display: "translated", // "translated" = translation on top, original small below; "original" = the reverse
+  priceIn: 0.15, // USD per 1M input tokens (gpt-4o-mini list price) — used when the provider doesn't report cost
+  priceOut: 0.6, // USD per 1M output tokens
 };
+
+function dlDayCost(d, settings) {
+  if (!d) return 0;
+  return (d.billed || 0) + ((d.unbilledIn || 0) * settings.priceIn + (d.unbilledOut || 0) * settings.priceOut) / 1e6;
+}
+
+function dlFormatUsd(v) {
+  if (!v) return "$0";
+  if (v < 0.01) return `$${v.toFixed(4)}`;
+  if (v < 100) return `$${v.toFixed(2)}`;
+  return `$${Math.round(v).toLocaleString("en-US")}`;
+}
+
+function dlCompact(n) {
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n || 0);
+}
 
 // Common languages offered in the UI. Anything ISO 639-1 works though.
 const DL_LANGS = [
