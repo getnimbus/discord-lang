@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Discord Lang</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Discord Lang</h1>
+      <label class="switch" title="Turn everything on/off">
+        <input type="checkbox" id="enabled" />
+        <span></span>
+      </label>
+    </header>
+
+    <section id="server" hidden>
+      <h2>This server</h2>
+      <div class="server-name" id="serverName"></div>
+      <label class="field">
+        <span>Main language</span>
+        <div class="row">
+          <select id="serverLang"></select>
+          <button type="button" id="detectNow" class="ghost" title="Detect from messages on screen">Detect</button>
+        </div>
+      </label>
+      <div class="hint" id="serverStats"></div>
+      <label class="check"><input type="checkbox" id="serverIncoming" /> Translate messages here</label>
+      <label class="check"><input type="checkbox" id="serverOutgoing" /> Translate my messages here</label>
+    </section>
+
+    <section id="noServer" class="hint">Open a Discord server or DM tab to see server settings.</section>
+
+    <section>
+      <h2>You</h2>
+      <label class="field">
+        <span>My language</span>
+        <select id="myLang"></select>
+      </label>
+      <label class="check"><input type="checkbox" id="incoming" /> Translate messages as I scroll</label>
+      <label class="check"><input type="checkbox" id="outgoing" /> Translate my messages before sending</label>
+      <div class="hint">Tip: <kbd>Alt</kbd>+<kbd>Enter</kbd> sends a message as typed, untranslated.</div>
+    </section>
+
+    <section>
+      <h2>API (OpenAI-compatible)</h2>
+      <label class="field">
+        <span>Base URL</span>
+        <input id="baseUrl" type="url" placeholder="https://api.openai.com/v1" spellcheck="false" />
+      </label>
+      <label class="field">
+        <span>API key</span>
+        <input id="apiKey" type="password" placeholder="sk-…" spellcheck="false" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span>Model</span>
+        <input id="model" type="text" placeholder="gpt-4o-mini" spellcheck="false" />
+      </label>
+      <div class="row">
+        <button type="button" id="save">Save &amp; test</button>
+        <span id="status" class="status"></span>
+      </div>
+    </section>
+
+    <script src="shared.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Discord Lang",
+  "version": "0.1.0",
+  "description": "Auto-translate Discord messages as you scroll, and translate your replies into each server's main language. Works with any OpenAI-compatible API.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://discord.com/*", "https://api.openai.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "src/background.js",
+    "scripts": ["src/shared.js", "src/background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://discord.com/*", "https://*.discord.com/*"],
+      "js": ["src/shared.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Discord Lang",
+    "default_popup": "src/popup.html"
+  },
+  "options_ui": {
+    "page": "src/popup.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "discord-lang@local",
+      "strict_min_version": "121.0"
+    }
+  }
+}

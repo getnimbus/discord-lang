@@ -1,1 +1,38 @@
-# discord-lang
+# Discord Lang
+
+Browser extension that auto-translates Discord (web) using any **OpenAI-compatible** API with your own key.
+
+- **Read**: messages are translated into your language as they scroll into view (shown under the original).
+- **Remember**: it tallies the language of every message it sees per server (and per DM). The most common one becomes that server's main language. You can pin it manually.
+- **Write**: press Enter and your message is translated into the server's main language, then sent.
+  - <kbd>Alt</kbd>+<kbd>Enter</kbd> sends exactly what you typed.
+  - Slash commands (`/…`) and messages already in the server's language are sent as-is.
+  - If translation fails, nothing is sent and your draft stays in the box.
+
+## Install
+
+**Chrome / Edge / Brave / Arc**: open `chrome://extensions`, turn on *Developer mode*, click *Load unpacked*, and pick this folder.
+
+**Firefox (121+)**: open `about:debugging#/runtime/this-firefox`, click *Load Temporary Add-on*, and pick `manifest.json`.
+
+Then open the extension popup and fill in:
+
+| Field    | Example                                                                                        |
+| -------- | ---------------------------------------------------------------------------------------------- |
+| Base URL | `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`, `http://localhost:11434/v1` (Ollama) |
+| API key  | `sk-…`                                                                                         |
+| Model    | `gpt-4o-mini` or any model your provider has                                                   |
+
+Click **Save & test**. If Discord was already open, reload the tab.
+
+## Per-server controls (popup, on a Discord tab)
+
+- **Main language**: *Auto* (learned from what you read) or pinned to a specific language. **Detect** asks the model to classify the messages on screen and pins the result.
+- Turn incoming or outgoing translation on or off for just that server.
+
+## Notes
+
+- Messages you read or send go to whichever API provider you configure.
+- To cut API calls, the browser's built-in language detector skips messages that are clearly already in your language. Translations are cached for the rest of the session.
+- It relies on Discord's DOM (`[id^="message-content-"]` for messages, the Slate `[role="textbox"]` editor for input). A Discord UI update can break it.
+- Discord's terms don't allow client modifications. This extension only changes what you see and what you type, but use it at your own risk.
