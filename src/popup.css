@@ -346,3 +346,9 @@ th {
 .switch input:checked + span::before {
   transform: translateX(16px);
 }
+
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
